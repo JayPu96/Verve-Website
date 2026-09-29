@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+    <title>You’re invited to a trip on Verve</title>
+    <meta name="description" content="Open the invite in Verve to see the plan and join the trip.">
+    <!-- Invite links are private: keep them out of search results. -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- Link previews (iMessage, WhatsApp, Slack…). Crawlers don't run
+         JavaScript, so these are the same for every invite. -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Verve">
+    <meta property="og:title" content="You’re invited to a trip on Verve">
+    <meta property="og:description" content="Tap to see the plan and join the trip.">
+    <meta property="og:image" content="https://getverveapp.com/images/og-invite.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="The Verve app icon and the words “You’re invited”">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="You’re invited to a trip on Verve">
+    <meta name="twitter:description" content="Tap to see the plan and join the trip.">
+    <meta name="twitter:image" content="https://getverveapp.com/images/og-invite.jpg">
+
+    <!-- Root-relative paths: this page is served at /invite/<code> and /trips/<id>. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/images/favicon-48.png">
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+
+    <script>
+        // Settings. The page adapts as these are filled in.
+        window.VERVE = {
+            // Numeric App Store ID: the digits in apps.apple.com/app/id<ID>.
+            // Turns on Safari's Smart App Banner and points the badge at the
+            // listing. Until it's set, the badge links to the homepage.
+            appStoreId: "",
+            // Google Play listing, once Verve for Android ships. Until then,
+            // Android visitors are pointed at the waitlist.
+            playStoreUrl: "",
+            androidPackage: "com.getverveapp.verve",
+            // Public invite preview: invitePreview in functions/index.js (app repo).
+            previewEndpoint: "https://us-central1-verve-94117.cloudfunctions.net/invitePreview"
+        };
+
+        // Which link is this? /invite/<token> or /trips/<id>, rewritten here by
+        // .htaccess. These rules MUST MATCH UniversalLink.swift in the app.
+        (function (verve) {
+            var match = /^\/(invite|trips)\/([^\/]+)\/?$/.exec(location.pathname);
+            var kind = !match ? "none" : match[1] === "invite" ? "invite" : "trip";
+            var code = match ? match[2] : "";
+            var valid = /^[A-Za-z0-9-]{1,64}$/.test(code);
+
+            verve.link = {
+                kind: kind,
+                code: code,
+                valid: valid,
+                // What the app receives from Universal Links and the Smart App Banner.
+                webURL: valid ? "https://getverveapp.com/" + match[1] + "/" + code : "https://getverveapp.com/",
+                // The custom-scheme twin, for the Open in Verve button: iOS never
+                // opens Universal Links for the domain of the page you're on.
+                appURL: !valid ? "verve://"
+                    : kind === "invite" ? "verve://trip-invite?token=" + code
+                    : "verve://trip/" + code
+            };
+
+            // Smart App Banner. Written while the parser is still in <head>, so
+            // Safari reads it exactly like static markup. Built only from
+            // validated values.
+            if (/^\d+$/.test(verve.appStoreId)) {
+                var content = "app-id=" + verve.appStoreId + (valid ? ", app-argument=" + verve.link.webURL : "");
+                document.write('<meta name="apple-itunes-app" content="' + content + '">');
+            }
+        })(window.VERVE);
+    </script>
+
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --text: #0f172a;
+            --muted: #64748b;
+            --card: rgba(255, 255, 255, 0.72);
+            --card-border: rgba(255, 255, 255, 0.7);
+            --card-shadow: 0 24px 48px -24px rgba(15, 23, 42, 0.28);
+            --inset: rgba(15, 23, 42, 0.045);
+            --line: rgba(15, 23, 42, 0.09);
+            --accent: #2563eb;
+            --eyebrow-bg: rgba(37, 99, 235, 0.09);
+            --button-bg: #000000;
+            --button-text: #ffffff;
+            --button-hover: #1e293b;
+            --glow-blue: rgba(147, 197, 253, 0.5);
+            --glow-purple: rgba(192, 132, 252, 0.32);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0b1120;
+                --text: #f1f5f9;
+                --muted: #94a3b8;
+                --card: rgba(30, 41, 59, 0.62);
+                --card-border: rgba(255, 255, 255, 0.08);
+                --card-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.7);
+                --inset: rgba(255, 255, 255, 0.05);
+                --line: rgba(255, 255, 255, 0.1);
+                --accent: #60a5fa;
+                --eyebrow-bg: rgba(96, 165, 250, 0.14);
+                --button-bg: #ffffff;
+                --button-text: #000000;
+                --button-hover: #e2e8f0;
+                --glow-blue: rgba(59, 130, 246, 0.24);
+                --glow-purple: rgba(147, 51, 234, 0.2);
+            }
+        }
+
+        /* Respect the reader's text size (Dynamic Type in Safari on iOS). */
+        @supports (font: -apple-system-body) {
+            html { font: -apple-system-body; }
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+
+        html {
+            background: var(--bg);
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            min-height: 100svh;
+            display: flex;
+            flex-direction: column;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.5;
+            color: var(--text);
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(60% 40% at 15% 0%, var(--glow-blue), transparent 70%),
+                radial-gradient(55% 35% at 95% 8%, var(--glow-purple), transparent 70%);
+            background-repeat: no-repeat;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: inherit; }
+
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
+        }
+
+        .site-header,
+        main {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+
+        .site-header { padding-top: 20px; }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.375rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            text-decoration: none;
+        }
+
+        .brand img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+        }
+
+        main {
+            flex: 1;
+            padding-top: 24px;
+            padding-bottom: 32px;
+        }
+
+        .card {
+            padding: 28px 24px;
+            border-radius: 28px;
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            box-shadow: var(--card-shadow);
+            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(20px);
+        }
+
+        .eyebrow {
+            display: inline-block;
+            margin: 0 0 14px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--accent);
+            background: var(--eyebrow-bg);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.15;
+            letter-spacing: -0.03em;
+        }
+
+        .subtitle {
+            margin: 10px 0 0;
+            font-size: 1.0625rem;
+            color: var(--muted);
+        }
+
+        .trip,
+        .skeleton {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 20px;
+            background: var(--inset);
+        }
+
+        .trip-destination {
+            display: flex;
+            gap: 6px;
+            margin: 0;
+            font-size: 0.9375rem;
+            color: var(--muted);
+        }
+
+        .trip-name {
+            margin: 4px 0 0;
+            font-size: 1.5rem;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            overflow-wrap: anywhere;
+        }
+
+        .stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 28px;
+            margin: 16px 0 0;
+            padding-top: 16px;
+            border-top: 1px solid var(--line);
+        }
+
+        .stats dt {
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .stats dd {
+            margin: 2px 0 0;
+            font-size: 1.0625rem;
+            font-weight: 700;
+        }
+
+        .from {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 16px 0 0;
+            font-size: 0.9375rem;
+            color: var(--muted);
+        }
+
+        .from strong { color: var(--text); }
+
+        .avatar {
+            display: inline-grid;
+            place-items: center;
+            flex: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            font-size: 1.0625rem;
+            background: var(--eyebrow-bg);
+        }
+
+        .skeleton {
+            display: grid;
+            gap: 12px;
+        }
+
+        .skeleton span {
+            display: block;
+            height: 14px;
+            border-radius: 7px;
+            background: linear-gradient(90deg, var(--line) 25%, var(--inset) 50%, var(--line) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s ease-in-out infinite;
+        }
+
+        .skeleton span:nth-child(1) { width: 40%; }
+        .skeleton span:nth-child(2) { width: 75%; height: 24px; }
+        .skeleton span:nth-child(3) { width: 55%; }
+
+        @keyframes shimmer {
+            from { background-position: 200% 0; }
+            to { background-position: -200% 0; }
+        }
+
+        .actions {
+            display: grid;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 56px;
+            padding: 14px 24px;
+            border-radius: 999px;
+            font-size: 1.0625rem;
+            font-weight: 700;
+            text-decoration: none;
+            color: var(--button-text);
+            background: var(--button-bg);
+            box-shadow: 0 12px 24px -12px rgba(15, 23, 42, 0.45);
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .button:hover { background: var(--button-hover); }
+        .button:active { transform: scale(0.98); }
+
+        .hint {
+            margin: 0;
+            font-size: 0.9375rem;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .get-app {
+            margin-top: 36px;
+            text-align: center;
+        }
+
+        .get-app h2 {
+            margin: 0;
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        .get-app p {
+            margin: 6px 0 0;
+            font-size: 0.9375rem;
+            color: var(--muted);
+        }
+
+        .stores {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .store-badge img {
+            display: block;
+            width: auto;
+            height: 44px;
+        }
+
+        .store-button {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+            padding: 0 18px;
+            border-radius: 10px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            text-decoration: none;
+            border: 1px solid var(--line);
+            background: var(--inset);
+        }
+
+        .get-app .android-soon { margin-top: 14px; }
+
+        .site-footer {
+            padding: 8px 20px 32px;
+            text-align: center;
+            font-size: 0.75rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .site-footer a { text-underline-offset: 3px; }
+
+        @media (min-width: 640px) {
+            main { padding-top: 56px; }
+            .card { padding: 36px 32px; }
+            h1 { font-size: 2.25rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .skeleton span { animation: none; }
+            .button { transition: none; }
+            .button:active { transform: none; }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="/">
+            <img src="/images/apple-touch-icon.png" alt="" width="32" height="32">
+            <span>Verve.</span>
+        </a>
+    </header>
+
+    <main>
+        <article class="card" id="card" aria-live="polite" aria-busy="false">
+            <p class="eyebrow" id="eyebrow">Trip invite</p>
+            <h1 id="title">You’re invited!</h1>
+            <p class="subtitle" id="subtitle">A friend invited you to plan a trip together on Verve.</p>
+
+            <div class="skeleton" id="skeleton" aria-hidden="true" hidden>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <section class="trip" id="trip" aria-label="Trip details" hidden>
+                <p class="trip-destination" id="destination-row">
+                    <span aria-hidden="true">📍</span>
+                    <span id="destination"></span>
+                </p>
+                <h2 class="trip-name" id="trip-name">Your trip</h2>
+                <dl class="stats" id="stats">
+                    <div id="people-row">
+                        <dt>Participants</dt>
+                        <dd id="people"></dd>
+                    </div>
+                    <div id="duration-row">
+                        <dt>Duration</dt>
+                        <dd id="duration"></dd>
+                    </div>
+                </dl>
+                <p class="from">
+                    <span class="avatar" id="from-emoji" aria-hidden="true">👤</span>
+                    <span>Invited by <strong id="from-name"></strong></span>
+                </p>
+            </section>
+        </article>
+
+        <div class="actions">
+            <a class="button" id="open-app" href="/" hidden>Open in Verve</a>
+            <p class="hint" id="open-hint" role="status" hidden></p>
+            <p class="hint" id="phone-hint" hidden>Open this link on your iPhone to continue in Verve.</p>
+        </div>
+
+        <section class="get-app" aria-labelledby="get-app-title">
+            <h2 id="get-app-title">New to Verve?</h2>
+            <p id="get-app-text">Get the app, then come back to this page and tap Open in Verve.</p>
+            <div class="stores">
+                <a class="store-badge" id="app-store" href="/">
+                    <img src="/images/app-store-badge.svg" alt="Download on the App Store" width="132" height="44">
+                </a>
+                <a class="store-button" id="google-play" href="/" hidden>Get it on Google Play</a>
+            </div>
+            <p class="android-soon" id="android-soon">On Android? <a href="/android.html">Verve for Android is coming soon.</a></p>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        © 2026 Verve LLC · <a href="/privacy.html">Privacy</a> · <a href="/termsofservice.html">Terms</a>
+    </footer>
+
+    <script>
+        (function (verve) {
+            var link = verve.link;
+            function $(id) { return document.getElementById(id); }
+            function show(id, visible) { $(id).hidden = !visible; }
+
+            var ua = navigator.userAgent;
+            var platform =
+                /android/i.test(ua) ? "android"
+                : /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios"
+                : /Macintosh/.test(ua) ? "mac"
+                : "other";
+            var hasAndroidApp = /^https:\/\//.test(verve.playStoreUrl);
+
+            // --- Store links ---
+            if (/^\d+$/.test(verve.appStoreId)) {
+                $("app-store").href = "https://apps.apple.com/app/id" + verve.appStoreId;
+            }
+            if (hasAndroidApp) {
+                $("google-play").href = verve.playStoreUrl;
+                show("google-play", true);
+                show("android-soon", false);
+            }
+
+            // --- Open in Verve ---
+            // Apple devices get the verve:// link. Android gets an intent: URL,
+            // which opens the app or falls back to Google Play by itself.
+            var openURL = null;
+            if (link.valid && (platform === "ios" || platform === "mac")) {
+                openURL = link.appURL;
+            } else if (link.valid && platform === "android" && hasAndroidApp) {
+                openURL = "intent://" + link.appURL.slice("verve://".length) +
+                    "#Intent;scheme=verve;package=" + verve.androidPackage +
+                    ";S.browser_fallback_url=" + encodeURIComponent(verve.playStoreUrl) + ";end";
+            }
+            if (openURL) {
+                $("open-app").href = openURL;
+            }
+
+            $("open-app").addEventListener("click", function () {
+                // If Verve opens, this page is hidden. If it's still showing a
+                // moment later, the app isn't installed, or an in-app browser
+                // (Instagram, Gmail…) blocked the hand-off.
+                var timer = setTimeout(function () {
+                    if (document.hidden) return;
+                    var browser = platform === "ios" ? "Safari" : "your browser";
+                    $("open-hint").textContent = "Didn’t open? Get Verve below, then tap Open in Verve again. " +
+                        "If you’re in another app’s browser, open this page in " + browser + " first.";
+                    show("open-hint", true);
+                }, 2500);
+                document.addEventListener("visibilitychange", function onChange() {
+                    if (!document.hidden) return;
+                    clearTimeout(timer);
+                    document.removeEventListener("visibilitychange", onChange);
+                });
+            });
+
+            // --- Card ---
+            function text(value, maxLength) {
+                return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+            }
+
+            function count(value) {
+                return typeof value === "number" && isFinite(value) && value > 0 ? Math.floor(value) : 0;
+            }
+
+            var copy = {
+                loading: ["Trip invite", "You’re invited!", "Loading the invite…"],
+                inviteGeneric: ["Trip invite", "You’re invited!",
+                    "A friend invited you to plan a trip together on Verve. Open the invite in the app to see the details and join."],
+                inactive: ["Trip invite", "This invite isn’t active",
+                    "The link may have been revoked. Ask whoever sent it for a new one."],
+                invalid: ["Verve", "This link doesn’t look right",
+                    "Check that you copied the whole link, or ask for a new one."],
+                trip: ["Trip", "Open this trip in Verve",
+                    "Trip plans live in the Verve app. Open it to see the itinerary, dates and who’s going."],
+                none: ["Verve", "Plan trips together",
+                    "Dates, itinerary and expenses for your whole group, in one place."]
+            };
+
+            function render(state, data) {
+                var invite = state === "invite" ? data : null;
+                var lines = invite
+                    ? ["Trip invite", "You’re invited!",
+                        (text(invite.fromDisplayName, 60) || "A friend") + " invited you to join a trip on Verve."]
+                    : copy[state];
+
+                $("eyebrow").textContent = lines[0];
+                $("title").textContent = lines[1];
+                $("subtitle").textContent = lines[2];
+                $("card").setAttribute("aria-busy", state === "loading" ? "true" : "false");
+                show("skeleton", state === "loading");
+                show("trip", !!invite);
+
+                if (invite) {
+                    var tripName = text(invite.tripName, 120);
+                    var destination = text(invite.destination, 120);
+                    var people = count(invite.participantCount);
+                    var days = count(invite.durationDays);
+
+                    $("trip-name").textContent = tripName;
+                    $("destination").textContent = destination;
+                    show("destination-row", !!destination);
+                    $("people").textContent = String(people);
+                    show("people-row", people > 0);
+                    $("duration").textContent = days + (days === 1 ? " day" : " days");
+                    show("duration-row", days > 0);
+                    show("stats", people > 0 || days > 0);
+                    $("from-name").textContent = text(invite.fromDisplayName, 60) || "a friend";
+                    $("from-emoji").textContent = text(invite.fromEmoji, 16) || "👤";
+                    document.title = "Join " + tripName + " on Verve";
+                } else {
+                    document.title = state === "trip" ? "Open this trip in Verve"
+                        : state === "inactive" || state === "invalid" || state === "none" ? "Verve"
+                        : "You’re invited to a trip on Verve";
+                }
+
+                var linkWorks = state !== "inactive" && state !== "invalid" && state !== "none";
+                show("open-app", linkWorks && !!openURL);
+                show("phone-hint", linkWorks && platform === "other");
+                if (!linkWorks) show("open-hint", false);
+                $("get-app-text").textContent = !linkWorks
+                    ? "Plan trips with your friends: dates, itinerary and expenses, all in one app."
+                    : link.kind === "invite"
+                        ? "Get the app, then come back to this page and tap Open in Verve to join the trip."
+                        : "Get the app, then come back to this page and tap Open in Verve.";
+            }
+
+            function loadInvite() {
+                render("loading");
+                if (!window.fetch || !verve.previewEndpoint) {
+                    render("inviteGeneric");
+                    return;
+                }
+
+                var controller = window.AbortController ? new AbortController() : null;
+                var timeout = setTimeout(function () { if (controller) controller.abort(); }, 8000);
+
+                fetch(verve.previewEndpoint + "?token=" + encodeURIComponent(link.code), {
+                    credentials: "omit",
+                    signal: controller ? controller.signal : undefined
+                })
+                    .then(function (response) {
+                        if (response.status === 404) return "inactive";
+                        if (response.status === 400) return "invalid";
+                        if (!response.ok) throw new Error("HTTP " + response.status);
+                        return response.json();
+                    })
+                    .then(function (result) {
+                        if (result === "inactive" || result === "invalid") {
+                            render(result);
+                        } else if (result && typeof result === "object" && text(result.tripName, 120)) {
+                            render("invite", result);
+                        } else {
+                            render("inviteGeneric");
+                        }
+                    })
+                    .catch(function () {
+                        // Offline, or the preview endpoint isn't deployed yet: the
+                        // invite still works in the app, so keep the page useful.
+                        render("inviteGeneric");
+                    })
+                    .then(function () {
+                        clearTimeout(timeout);
+                    });
+            }
+
+            if (link.kind === "none") {
+                render("none");
+            } else if (!link.valid) {
+                render("invalid");
+            } else if (link.kind === "trip") {
+                render("trip");
+            } else {
+                loadInvite();
+            }
+        })(window.VERVE);
+    </script>
+</body>
+</html>

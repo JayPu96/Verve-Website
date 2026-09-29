@@ -1,0 +1,36 @@
+# getverveapp.com: Apache / LiteSpeed (Hostinger) configuration.
+#
+# Universal Links (iOS) and App Links (Android) are documented in
+# UNIVERSAL_LINKS.md in the app repo (JayPu96/Seekr). The /invite/ and /trips/
+# paths below MUST MATCH .well-known/apple-app-site-association and
+# UniversalLink.swift in the app.
+
+# --- App association files ------------------------------------------------
+# Apple and Google fetch these directly. They must come back 200, as JSON,
+# over HTTPS, with no redirect. The AASA file has no extension, so the server
+# can't infer its type.
+<Files "apple-app-site-association">
+    ForceType application/json
+</Files>
+<IfModule mod_headers.c>
+    <FilesMatch "^(apple-app-site-association|assetlinks\.json)$">
+        Header set Content-Type "application/json"
+        Header set Cache-Control "public, max-age=3600"
+    </FilesMatch>
+</IfModule>
+
+RewriteEngine On
+RewriteBase /
+
+# Never serve dotfiles, such as the .git/ a Git deploy leaves in the web root.
+# /.well-known/ is the exception: the association files live there.
+RewriteRule (^|/)\.(?!well-known(/|$)) - [F]
+
+# Older iOS versions look for the AASA file at the site root. Serve the same
+# file there with an internal rewrite (a redirect would fail validation).
+RewriteRule ^apple-app-site-association$ /.well-known/apple-app-site-association [L]
+
+# --- Invite and trip landing pages ----------------------------------------
+# /invite/<code> and /trips/<id> both render invite.html, which reads the code
+# from the address bar. Internal rewrites only: the shared URL must stay as-is.
+RewriteRule ^(invite|trips)/[^/]+/?$ /invite.html [L]

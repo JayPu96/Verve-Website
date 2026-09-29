@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["6AGXR4A8C2.com.getverveapp.verve"],
+        "components": [
+          {
+            "/": "/invite/?*",
+            "comment": "Trip invite links: /invite/<share token>. Opens TripInviteLandingView."
+          },
+          {
+            "/": "/trips/?*",
+            "comment": "Trip links: /trips/<trip id>. Opens the trip if the user can already see it."
+          }
+        ]
+      }
+    ]
+  }
+}
