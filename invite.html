@@ -6,13 +6,16 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
-    <title>You’re invited to a trip on Verve</title>
-    <meta name="description" content="Open the invite in Verve to see the plan and join the trip.">
     <!-- Invite links are private: keep them out of search results. -->
     <meta name="robots" content="noindex, nofollow">
 
-    <!-- Link previews (iMessage, WhatsApp, Slack…). Crawlers don't run
-         JavaScript, so these are the same for every invite. -->
+    <!-- preview:start
+         Link previews (iMessage, WhatsApp, Slack…). Crawlers don't run
+         JavaScript, so for /invite/<token> invite.php swaps this block for the
+         invite's own title, description and picture. These generic tags are
+         what /trips/<id> and any fallback show. -->
+    <title>You’re invited to a trip on Verve</title>
+    <meta name="description" content="Open the invite in Verve to see the plan and join the trip.">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Verve">
     <meta property="og:title" content="You’re invited to a trip on Verve">
@@ -25,6 +28,9 @@
     <meta name="twitter:title" content="You’re invited to a trip on Verve">
     <meta name="twitter:description" content="Tap to see the plan and join the trip.">
     <meta name="twitter:image" content="https://getverveapp.com/images/og-invite.jpg">
+    <!-- preview:end -->
+
+    <!-- invite:data (invite.php puts the invite it fetched here, as window.VERVE_INVITE) -->
 
     <!-- Root-relative paths: this page is served at /invite/<code> and /trips/<id>. -->
     <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon.png">
@@ -616,7 +622,27 @@
                         : "Get the app, then come back to this page and tap Open in Verve.";
             }
 
+            // invitePreview's answer: its HTTP status and body.
+            function showInvite(status, invite) {
+                if (status === 404) {
+                    render("inactive");
+                } else if (status === 400) {
+                    render("invalid");
+                } else if (status === 200 && invite && typeof invite === "object" && text(invite.tripName, 120)) {
+                    render("invite", invite);
+                } else {
+                    render("inviteGeneric");
+                }
+            }
+
             function loadInvite() {
+                // invite.php already asked invitePreview, for the link preview.
+                var preloaded = window.VERVE_INVITE;
+                if (preloaded && typeof preloaded === "object") {
+                    showInvite(preloaded.status, preloaded.invite);
+                    return;
+                }
+
                 render("loading");
                 if (!window.fetch || !verve.previewEndpoint) {
                     render("inviteGeneric");
@@ -631,19 +657,10 @@
                     signal: controller ? controller.signal : undefined
                 })
                     .then(function (response) {
-                        if (response.status === 404) return "inactive";
-                        if (response.status === 400) return "invalid";
-                        if (!response.ok) throw new Error("HTTP " + response.status);
-                        return response.json();
-                    })
-                    .then(function (result) {
-                        if (result === "inactive" || result === "invalid") {
-                            render(result);
-                        } else if (result && typeof result === "object" && text(result.tripName, 120)) {
-                            render("invite", result);
-                        } else {
-                            render("inviteGeneric");
-                        }
+                        if (!response.ok) return showInvite(response.status, null);
+                        return response.json().then(function (invite) {
+                            showInvite(200, invite);
+                        });
                     })
                     .catch(function () {
                         // Offline, or the preview endpoint isn't deployed yet: the
