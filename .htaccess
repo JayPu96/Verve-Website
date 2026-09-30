@@ -31,6 +31,9 @@ RewriteRule (^|/)\.(?!well-known(/|$)) - [F]
 RewriteRule ^apple-app-site-association$ /.well-known/apple-app-site-association [L]
 
 # --- Invite and trip landing pages ----------------------------------------
-# /invite/<code> and /trips/<id> both render invite.html, which reads the code
-# from the address bar. Internal rewrites only: the shared URL must stay as-is.
-RewriteRule ^(invite|trips)/[^/]+/?$ /invite.html [L]
+# Both render invite.html, which reads the code from the address bar.
+# /invite/<code> goes through invite.php first, which fills in that invite's
+# link preview (title, picture). Internal rewrites only: the shared URL must
+# stay as-is.
+RewriteRule ^invite/[^/]+/?$ /invite.php [L]
+RewriteRule ^trips/[^/]+/?$ /invite.html [L]
