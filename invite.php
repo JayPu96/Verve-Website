@@ -7,7 +7,8 @@
 // invite's own title, description and image from invitePreview
 // (functions/index.js in the app repo), and hands the page the same data so it
 // doesn't fetch it again. The image (shareImageURL) is the trip's card from the
-// app's Share Trip sheet, drawn by the inviteCard function.
+// app's Share Trip sheet, drawn by the inviteCard function; since it shows the
+// trip's name, the caption says "Join my trip on Verve".
 //
 // If anything goes wrong (a malformed token, the function unreachable), this
 // serves invite.html untouched: the generic preview, and the page loads the
@@ -88,26 +89,31 @@ function invite_tags($token, $invite)
 
     $inviter = field($invite, 'fromDisplayName', 60);
     $preview = isset($invite['preview']) && is_array($invite['preview']) ? $invite['preview'] : array();
-    $parts = array_filter(array(
-        $inviter !== '' ? $inviter . ' invited you on Verve' : 'You’re invited on Verve',
-        field($preview, 'dateSummary', 60),
-        field($invite, 'destination', 60),
-    ), 'strlen');
-    $description = implode(' · ', $parts);
+    $invited = $tripName === ''
+        ? ($inviter !== '' ? $inviter . ' invited you on Verve' : 'You’re invited on Verve')
+        : ($inviter !== '' ? $inviter . ' invited you to ' . $tripName : 'You’re invited to ' . $tripName);
+    $description = implode(' · ', array_filter(array($invited, field($preview, 'dateSummary', 60)), 'strlen'));
 
     $image = field($invite, 'shareImageURL', 1000);
     $width = isset($invite['shareImageWidth']) && is_int($invite['shareImageWidth']) ? $invite['shareImageWidth'] : 0;
     $height = isset($invite['shareImageHeight']) && is_int($invite['shareImageHeight']) ? $invite['shareImageHeight'] : 0;
+    $cardShowsName = isset($invite['shareImageShowsTitle']) && $invite['shareImageShowsTitle'] === true;
     if (!preg_match('#^https://[^\s"<>]+$#', $image) || $width <= 0 || $height <= 0) {
         list($image, $width, $height) = array(DEFAULT_IMAGE, 1200, 630);
+        $cardShowsName = false;
     }
+    // The card already shows the trip's name, so the caption under it (Messages
+    // prints og:title there) asks instead of repeating it. Each link is one
+    // person's, so "my" is theirs. When the card can't draw the name (a script
+    // its fonts don't cover), or there's no card, the caption carries the name.
+    $caption = $cardShowsName ? 'Join my trip on Verve' : $title;
 
     // The card's background photo, credited when it's from Unsplash.
     $author = field($invite, 'backgroundUnsplashAuthor', 100);
     $fromUnsplash = strpos(field($invite, 'backgroundUnsplashURL', 1000), 'https://images.unsplash.com/') === 0;
     $alt = $title . ($fromUnsplash && $author !== '' ? '. Photo by ' . $author . ' on Unsplash' : '');
 
-    return preview_tags($token, 'Join ' . $title . ' on Verve', $title, $description, array($image, $width, $height), $alt);
+    return preview_tags($token, 'Join ' . $title . ' on Verve', $caption, $description, array($image, $width, $height), $alt);
 }
 
 /** Revoked or unknown links: say so, and show nothing about the trip. */
