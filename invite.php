@@ -4,9 +4,10 @@
 // Messages, WhatsApp, Slack and the rest build a link's preview from the
 // page's Open Graph tags without running JavaScript, so each invite's name and
 // picture have to be in the HTML itself. This serves invite.html with the
-// invite's own title, description and image (the trip's background:
-// shareImageURL) from invitePreview (functions/index.js in the app repo), and
-// hands the page the same data so it doesn't fetch it again.
+// invite's own title, description and image from invitePreview
+// (functions/index.js in the app repo), and hands the page the same data so it
+// doesn't fetch it again. The image (shareImageURL) is the trip's card from the
+// app's Share Trip sheet, drawn by the inviteCard function.
 //
 // If anything goes wrong (a malformed token, the function unreachable), this
 // serves invite.html untouched: the generic preview, and the page loads the
@@ -95,14 +96,18 @@ function invite_tags($token, $invite)
     $description = implode(' · ', $parts);
 
     $image = field($invite, 'shareImageURL', 1000);
-    if (!preg_match('#^https://[^\s"<>]+$#', $image)) {
-        $image = DEFAULT_IMAGE;
+    $width = isset($invite['shareImageWidth']) && is_int($invite['shareImageWidth']) ? $invite['shareImageWidth'] : 0;
+    $height = isset($invite['shareImageHeight']) && is_int($invite['shareImageHeight']) ? $invite['shareImageHeight'] : 0;
+    if (!preg_match('#^https://[^\s"<>]+$#', $image) || $width <= 0 || $height <= 0) {
+        list($image, $width, $height) = array(DEFAULT_IMAGE, 1200, 630);
     }
-    $author = field($invite, 'backgroundUnsplashAuthor', 100);
-    $isUnsplash = strpos($image, 'https://images.unsplash.com/') === 0;
-    $alt = $isUnsplash && $author !== '' ? 'Photo by ' . $author . ' on Unsplash' : $title;
 
-    return preview_tags($token, 'Join ' . $title . ' on Verve', $title, $description, $image, $alt);
+    // The card's background photo, credited when it's from Unsplash.
+    $author = field($invite, 'backgroundUnsplashAuthor', 100);
+    $fromUnsplash = strpos(field($invite, 'backgroundUnsplashURL', 1000), 'https://images.unsplash.com/') === 0;
+    $alt = $title . ($fromUnsplash && $author !== '' ? '. Photo by ' . $author . ' on Unsplash' : '');
+
+    return preview_tags($token, 'Join ' . $title . ' on Verve', $title, $description, array($image, $width, $height), $alt);
 }
 
 /** Revoked or unknown links: say so, and show nothing about the trip. */
@@ -113,13 +118,15 @@ function inactive_tags($token)
         'Verve',
         'This invite isn’t active',
         'Ask whoever sent it for a new link.',
-        DEFAULT_IMAGE,
+        array(DEFAULT_IMAGE, 1200, 630),
         'The Verve app icon'
     );
 }
 
-function preview_tags($token, $pageTitle, $title, $description, $image, $alt)
+/** $picture: [url, width, height]. */
+function preview_tags($token, $pageTitle, $title, $description, $picture, $alt)
 {
+    list($image, $width, $height) = $picture;
     $url = SITE . '/invite/' . $token;
     $lines = array(
         '<title>' . esc($pageTitle) . '</title>',
@@ -130,8 +137,8 @@ function preview_tags($token, $pageTitle, $title, $description, $image, $alt)
         '<meta property="og:title" content="' . esc($title) . '">',
         '<meta property="og:description" content="' . esc($description) . '">',
         '<meta property="og:image" content="' . esc($image) . '">',
-        '<meta property="og:image:width" content="1200">',
-        '<meta property="og:image:height" content="630">',
+        '<meta property="og:image:width" content="' . (int) $width . '">',
+        '<meta property="og:image:height" content="' . (int) $height . '">',
         '<meta property="og:image:alt" content="' . esc($alt) . '">',
         '<meta name="twitter:card" content="summary_large_image">',
         '<meta name="twitter:title" content="' . esc($title) . '">',
