@@ -2,11 +2,12 @@
 // Link previews for friend links: https://getverveapp.com/add/<user id>.
 //
 // Each person has one, from the app's Invite Friends sheet; tapping it opens
-// their profile in Verve to add them. Messages draws its bubble from the card
-// the app hands the share sheet, so this is for everything else (WhatsApp,
-// Slack, Mail…) and for people without Verve: it serves invite.html with the
-// person's name in the preview, and hands the page the same data so it doesn't
-// fetch it again. Only the name and emoji are public (friendInvitePreview in
+// their profile in Verve to add them. The preview is the same picture for
+// everyone — avatar pins over a globe (images/og-friend.jpg, drawn with the
+// app's FriendInviteCard by scripts/render_friend_invite_card.py in the app
+// repo) — with "Share Trips with <name>" under it. This serves invite.html
+// with those tags, and hands the page the same data so it doesn't fetch it
+// again. Only the name and emoji are public (friendInvitePreview in
 // functions/index.js of the app repo).
 //
 // If the name can't be fetched, the preview leaves it out and the page asks
@@ -16,9 +17,7 @@ ini_set('display_errors', '0');
 
 const PREVIEW_ENDPOINT = 'https://us-central1-verve-94117.cloudfunctions.net/friendInvitePreview';
 const SITE = 'https://getverveapp.com';
-const DEFAULT_IMAGE = SITE . '/images/og-invite.jpg';
-// MUST MATCH FriendInviteShareItem.title in the app (and INVITE_TITLE in functions/friendInvite.js).
-const INVITE_TITLE = 'Add me as a friend on Verve';
+const FRIEND_IMAGE = SITE . '/images/og-friend.jpg';
 
 header('Content-Type: text/html; charset=utf-8');
 header('X-Robots-Tag: noindex, nofollow');
@@ -83,7 +82,13 @@ function friend_tags($uid, $friend)
     $name = field($friend, 'displayName', 60);
     $pageTitle = $name !== '' ? 'Add ' . $name . ' on Verve' : 'Let’s be friends on Verve';
     $description = ($name !== '' ? $name : 'A friend') . ' wants to plan trips with you on Verve.';
-    return preview_tags($uid, $pageTitle, INVITE_TITLE, $description);
+    return preview_tags($uid, $pageTitle, invite_title($name), $description);
+}
+
+/** The caption under the picture. MUST MATCH FriendInviteShareItem.title(for:) and inviteTitle() in functions/friendInvite.js. */
+function invite_title($name)
+{
+    return $name !== '' ? 'Share Trips with ' . $name : 'Share Trips on Verve';
 }
 
 function inactive_tags($uid)
@@ -102,14 +107,14 @@ function preview_tags($uid, $pageTitle, $title, $description)
         '<meta property="og:url" content="' . esc($url) . '">',
         '<meta property="og:title" content="' . esc($title) . '">',
         '<meta property="og:description" content="' . esc($description) . '">',
-        '<meta property="og:image" content="' . esc(DEFAULT_IMAGE) . '">',
+        '<meta property="og:image" content="' . esc(FRIEND_IMAGE) . '">',
         '<meta property="og:image:width" content="1200">',
         '<meta property="og:image:height" content="630">',
-        '<meta property="og:image:alt" content="The Verve app icon">',
+        '<meta property="og:image:alt" content="Friends as avatar pins over a globe, with planes flying between them">',
         '<meta name="twitter:card" content="summary_large_image">',
         '<meta name="twitter:title" content="' . esc($title) . '">',
         '<meta name="twitter:description" content="' . esc($description) . '">',
-        '<meta name="twitter:image" content="' . esc(DEFAULT_IMAGE) . '">',
+        '<meta name="twitter:image" content="' . esc(FRIEND_IMAGE) . '">',
     );
     return implode("\n    ", $lines);
 }

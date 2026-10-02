@@ -592,7 +592,7 @@
                         (text(invite.fromDisplayName, 60) || "A friend") + " invited you to join a trip on Verve."]
                     : state === "friend"
                         ? ["Friend invite",
-                            (text(data && data.emoji, 16) ? text(data.emoji, 16) + " " : "") + "Add " + friendName + " on Verve",
+                            "Share Trips with " + friendName,
                             friendName + " wants to plan trips with you. Open Verve to add them as a friend."]
                         : copy[state];
 
