@@ -31,8 +31,9 @@
     <!-- preview:end -->
 
     <!-- invite:data (invite.php puts the invite it fetched here, as window.VERVE_INVITE) -->
+    <!-- friend:data (add.php puts the friend link it fetched here, as window.VERVE_FRIEND) -->
 
-    <!-- Root-relative paths: this page is served at /invite/<code> and /trips/<id>. -->
+    <!-- Root-relative paths: this page is served at /invite/<code>, /trips/<id> and /add/<user id>. -->
     <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon.png">
     <link rel="icon" type="image/png" sizes="48x48" href="/images/favicon-48.png">
     <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
@@ -49,14 +50,17 @@
             playStoreUrl: "",
             androidPackage: "com.getverveapp.verve",
             // Public invite preview: invitePreview in functions/index.js (app repo).
-            previewEndpoint: "https://us-central1-verve-94117.cloudfunctions.net/invitePreview"
+            previewEndpoint: "https://us-central1-verve-94117.cloudfunctions.net/invitePreview",
+            // Public part of a friend link: friendInvitePreview in functions/index.js.
+            friendEndpoint: "https://us-central1-verve-94117.cloudfunctions.net/friendInvitePreview"
         };
 
-        // Which link is this? /invite/<token> or /trips/<id>, rewritten here by
-        // .htaccess. These rules MUST MATCH UniversalLink.swift in the app.
+        // Which link is this? /invite/<token>, /trips/<id> or /add/<user id>,
+        // rewritten here by .htaccess. These rules MUST MATCH UniversalLink.swift
+        // in the app.
         (function (verve) {
-            var match = /^\/(invite|trips)\/([^\/]+)\/?$/.exec(location.pathname);
-            var kind = !match ? "none" : match[1] === "invite" ? "invite" : "trip";
+            var match = /^\/(invite|trips|add)\/([^\/]+)\/?$/.exec(location.pathname);
+            var kind = !match ? "none" : match[1] === "invite" ? "invite" : match[1] === "add" ? "friend" : "trip";
             var code = match ? match[2] : "";
             var valid = /^[A-Za-z0-9-]{1,64}$/.test(code);
 
@@ -70,6 +74,7 @@
                 // opens Universal Links for the domain of the page you're on.
                 appURL: !valid ? "verve://"
                     : kind === "invite" ? "verve://trip-invite?token=" + code
+                    : kind === "friend" ? "verve://add-friend?uid=" + code
                     : "verve://trip/" + code
             };
 
@@ -568,6 +573,11 @@
                     "The link may have been revoked. Ask whoever sent it for a new one."],
                 invalid: ["Verve", "This link doesn’t look right",
                     "Check that you copied the whole link, or ask for a new one."],
+                friendLoading: ["Friend invite", "Let’s be friends on Verve", "Loading…"],
+                friendGeneric: ["Friend invite", "Let’s be friends on Verve",
+                    "A friend wants to plan trips with you on Verve. Open the link in the app to add them."],
+                friendInactive: ["Verve", "This link isn’t active",
+                    "Ask whoever sent it to share their link again."],
                 trip: ["Trip", "Open this trip in Verve",
                     "Trip plans live in the Verve app. Open it to see the itinerary, dates and who’s going."],
                 none: ["Verve", "Plan trips together",
@@ -576,16 +586,21 @@
 
             function render(state, data) {
                 var invite = state === "invite" ? data : null;
+                var friendName = state === "friend" && data ? text(data.displayName, 60) : "";
                 var lines = invite
                     ? ["Trip invite", "You’re invited!",
                         (text(invite.fromDisplayName, 60) || "A friend") + " invited you to join a trip on Verve."]
-                    : copy[state];
+                    : state === "friend"
+                        ? ["Friend invite",
+                            (text(data && data.emoji, 16) ? text(data.emoji, 16) + " " : "") + "Add " + friendName + " on Verve",
+                            friendName + " wants to plan trips with you. Open Verve to add them as a friend."]
+                        : copy[state];
 
                 $("eyebrow").textContent = lines[0];
                 $("title").textContent = lines[1];
                 $("subtitle").textContent = lines[2];
-                $("card").setAttribute("aria-busy", state === "loading" ? "true" : "false");
-                show("skeleton", state === "loading");
+                $("card").setAttribute("aria-busy", state === "loading" || state === "friendLoading" ? "true" : "false");
+                show("skeleton", state === "loading" || state === "friendLoading");
                 show("trip", !!invite);
 
                 if (invite) {
@@ -605,13 +620,15 @@
                     $("from-name").textContent = text(invite.fromDisplayName, 60) || "a friend";
                     $("from-emoji").textContent = text(invite.fromEmoji, 16) || "👤";
                     document.title = "Join " + tripName + " on Verve";
+                } else if (state === "friend") {
+                    document.title = "Add " + friendName + " on Verve";
                 } else {
                     document.title = state === "trip" ? "Open this trip in Verve"
                         : state === "inactive" || state === "invalid" || state === "none" ? "Verve"
                         : "You’re invited to a trip on Verve";
                 }
 
-                var linkWorks = state !== "inactive" && state !== "invalid" && state !== "none";
+                var linkWorks = state !== "inactive" && state !== "friendInactive" && state !== "invalid" && state !== "none";
                 show("open-app", linkWorks && !!openURL);
                 show("phone-hint", linkWorks && platform === "other");
                 if (!linkWorks) show("open-hint", false);
@@ -619,7 +636,9 @@
                     ? "Plan trips with your friends: dates, itinerary and expenses, all in one app."
                     : link.kind === "invite"
                         ? "Get the app, then come back to this page and tap Open in Verve to join the trip."
-                        : "Get the app, then come back to this page and tap Open in Verve.";
+                        : link.kind === "friend"
+                            ? "Get the app, then come back to this page and tap Open in Verve to add them."
+                            : "Get the app, then come back to this page and tap Open in Verve.";
             }
 
             // invitePreview's answer: its HTTP status and body.
@@ -672,12 +691,48 @@
                     });
             }
 
+            // friendInvitePreview's answer: its HTTP status and body.
+            function showFriend(status, friend) {
+                if (status === 404) {
+                    render("friendInactive");
+                } else if (status === 400) {
+                    render("invalid");
+                } else if (status === 200 && friend && typeof friend === "object" && text(friend.displayName, 60)) {
+                    render("friend", friend);
+                } else {
+                    render("friendGeneric");
+                }
+            }
+
+            function loadFriend() {
+                // add.php already asked friendInvitePreview, for the link preview.
+                var preloaded = window.VERVE_FRIEND;
+                if (preloaded && typeof preloaded === "object") {
+                    showFriend(preloaded.status, preloaded.friend);
+                    return;
+                }
+
+                render("friendLoading");
+                if (!window.fetch || !verve.friendEndpoint) {
+                    render("friendGeneric");
+                    return;
+                }
+                fetch(verve.friendEndpoint + "?uid=" + encodeURIComponent(link.code), { credentials: "omit" })
+                    .then(function (response) {
+                        if (!response.ok) return showFriend(response.status, null);
+                        return response.json().then(function (friend) { showFriend(200, friend); });
+                    })
+                    .catch(function () { render("friendGeneric"); });
+            }
+
             if (link.kind === "none") {
                 render("none");
             } else if (!link.valid) {
                 render("invalid");
             } else if (link.kind === "trip") {
                 render("trip");
+            } else if (link.kind === "friend") {
+                loadFriend();
             } else {
                 loadInvite();
             }
