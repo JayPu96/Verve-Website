@@ -1,8 +1,8 @@
 # getverveapp.com: Apache / LiteSpeed (Hostinger) configuration.
 #
 # Universal Links (iOS) and App Links (Android) are documented in
-# UNIVERSAL_LINKS.md in the app repo (JayPu96/Seekr). The /invite/ and /trips/
-# paths below MUST MATCH .well-known/apple-app-site-association and
+# UNIVERSAL_LINKS.md in the app repo (JayPu96/Seekr). The /invite/, /trips/ and
+# /add/ paths below MUST MATCH .well-known/apple-app-site-association and
 # UniversalLink.swift in the app.
 
 # --- App association files ------------------------------------------------
@@ -30,10 +30,12 @@ RewriteRule (^|/)\.(?!well-known(/|$)) - [F]
 # file there with an internal rewrite (a redirect would fail validation).
 RewriteRule ^apple-app-site-association$ /.well-known/apple-app-site-association [L]
 
-# --- Invite and trip landing pages ----------------------------------------
-# Both render invite.html, which reads the code from the address bar.
+# --- Invite, trip and friend landing pages --------------------------------
+# All render invite.html, which reads the code from the address bar.
 # /invite/<code> goes through invite.php first, which fills in that invite's
-# link preview (title, picture). Internal rewrites only: the shared URL must
+# link preview (title, picture), and /add/<user id> through add.php, which
+# fills in whose friend link it is. Internal rewrites only: the shared URL must
 # stay as-is.
 RewriteRule ^invite/[^/]+/?$ /invite.php [L]
 RewriteRule ^trips/[^/]+/?$ /invite.html [L]
+RewriteRule ^add/[^/]+/?$ /add.php [L]

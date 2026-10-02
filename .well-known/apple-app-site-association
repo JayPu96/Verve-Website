@@ -11,6 +11,10 @@
           {
             "/": "/trips/?*",
             "comment": "Trip links: /trips/<trip id>. Opens the trip if the user can already see it."
+          },
+          {
+            "/": "/add/?*",
+            "comment": "Friend links: /add/<user id>. Opens their profile to send a friend request."
           }
         ]
       }
